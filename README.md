@@ -22,6 +22,10 @@ Code:
 /plugin install flow@flow
 ```
 
+The plugin also has a `SessionStart` hook. In a flow terminal panel, it
+stores the Claude Code session id on that terminal, so `get_terminals` can
+tell which agent runs where. Outside flow, the hook does nothing.
+
 ## Install in other agents
 
 The skill uses the open Agent Skills format. Copy the `skills/drive-flow`
