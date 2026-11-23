@@ -49,9 +49,14 @@ Each line is one instance:
 ```
 
 The first project is the current project of that instance. The others are
-its background projects, most recently used first. If exactly one instance
-has your project as its current project, connect with its `socket`. If none
-or more than one has it, ask the user.
+its background projects, most recently used first.
+
+An instance matches if its current project is your working directory or a
+parent directory of it. If exactly one instance matches, connect with its
+`socket`. If no instance matches, or more than one matches, stop and ask the
+user which instance to use, also if only one instance runs. Do not choose
+from other signs, for example a background project, or a project that has
+the file that the user named.
 
 An instance that does not reply in time is reported as not responding.
 `--list-servers` removes the socket files of crashed instances and reports

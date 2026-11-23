@@ -25,9 +25,15 @@ Find out which flow to use before you send a command.
 2. If the user gave a server name (flow started with `--server NAME`), use
    `flow --connect NAME --exec ...`.
 3. Else, run `flow --list-servers --json`. Each line is one running instance
-   with its socket path and its projects, current project first. If exactly
-   one instance has the project you work on, connect with its `socket`
-   value. If none or more than one has it, ask the user.
+   with its socket path and its projects, current project first. An instance
+   matches if its current project is your working directory or a parent
+   directory of it. If exactly one instance matches, connect with its
+   `socket` value.
+4. If no instance matches, or more than one matches, stop and ask the user
+   which instance to use. Show each instance with its name and its current
+   project. Do this also if only one instance runs. Do not choose from other
+   signs, for example a background project, or a project that has the file
+   that the user named.
 
 If `FLOW_SOCKET` is not set, always give `--connect`. Without a socket,
 `flow --exec` starts a new editor in your terminal and runs the commands

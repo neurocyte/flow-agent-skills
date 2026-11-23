@@ -38,8 +38,9 @@ The skill handles three configurations:
 
 1. The agent runs in a flow terminal panel. It connects with no setup.
 2. You start flow with `flow --server NAME` and tell the agent the name.
-3. The agent finds the running instances with `flow --list-servers`. If it
-   cannot tell which instance to use, it asks you.
+3. The agent finds the running instances with `flow --list-servers`. It uses
+   the instance whose current project contains its working directory. If no
+   instance or more than one does, it asks you.
 
 For a flow on another machine, or an agent in a Docker container, forward
 the flow socket and give the agent the local socket path.
