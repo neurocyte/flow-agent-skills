@@ -1,0 +1,11 @@
+{
+  "name": "flow",
+  "description": "Drive a running Flow Control editor from a coding agent through the flow remote client",
+  "author": {
+    "name": "CJ van den Berg"
+  },
+  "homepage": "https://flow-control.dev",
+  "repository": "https://github.com/neurocyte/flow-agent-skills",
+  "license": "MIT",
+  "keywords": ["flow", "editor", "remote-control"]
+}

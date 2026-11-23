@@ -1,0 +1,13 @@
+{
+  "name": "flow",
+  "owner": {
+    "name": "CJ van den Berg"
+  },
+  "plugins": [
+    {
+      "name": "flow",
+      "source": "./",
+      "description": "Drive a running Flow Control editor from a coding agent through the flow remote client"
+    }
+  ]
+}
