@@ -312,6 +312,46 @@ entries closes.
 If the exit code is 1, the buffer can still be there. Remove it with
 `flow --exec 'delete_buffer:BUFFER' </dev/null`.
 
+## Follow the user through locations
+
+To explain each location while the user steps through a list, run the
+follower script. The script waits for the user's cursor. When the cursor
+reaches a line that you gave, it shows your explanation in an info box at
+the cursor. It needs flow `v0.7.2-2165` or later, for the client and for the
+flow that you drive.
+
+1. Open the list as in "Show a list of locations".
+2. Write a JSON file with one object for each location:
+
+   ```
+   [
+     {"path": "src/main.zig", "line": 120, "markdown": "### parse_args\n\nAn empty value ..."},
+     {"path": "src/main.zig", "line": 200, "markdown": "..."}
+   ]
+   ```
+
+   path is absolute, or relative to the project directory. line is 1-based.
+   Use the same lines as in the list.
+
+3. Run the script in the background. It is `scripts/follow-info-boxes.py` in
+   the directory of this skill:
+
+   ```
+   python3 -I SKILL_DIR/scripts/follow-info-boxes.py --connect SERVER --timeout 1800 ENTRIES.json
+   ```
+
+   Without `FLOW_SOCKET`, give `--connect` as for every other call.
+
+If the cursor or a selection moves onto one of the lines, the script shows
+the box. A list entry moves the cursor there, and so does the user with the
+keys or the mouse. If the cursor stays on the line, the script does not show
+the box again. If the cursor leaves the range of the box, the box closes. A
+scroll does not close it.
+
+These events stop the script: flow quits, the timeout ends, or you send
+SIGTERM. If the user is done with the list, stop the script. Tell the user
+that the script runs, and for how long.
+
 ## Run commands in a terminal
 
 `flow --hold --run-in-terminal -- CMD ARGS` runs a command in a new terminal
@@ -346,3 +386,20 @@ replies, until flow quits or you stop the client. `follow_log [count]`
 streams new log entries. `get_actors` lists the actors, and
 `follow_trace PIID` streams the messages of one actor. Use these to debug
 flow, with a timeout.
+
+`follow_editors` streams the events of all editors, in all views, as
+`["editor", BUFID, view_index, event]`. Some events:
+
+- `["E", "pos", lines, row, col]`: the primary cursor moved.
+- `["E", "sel", begin_row, begin_col, end_row, end_col]`, or
+  `["E", "sel", "none"]`: the primary selection changed.
+- `["E", "view", lines, rows, top_row]`: the view scrolled.
+- `["E", "open", path, ...]` and `["E", "close"]`: the editor opened or
+  closed a buffer.
+- `["E", "dirty", true]`: the buffer has changes that are not saved.
+
+Rows and columns in events are 0-based, and columns are screen columns. This
+is not the numbering of the queries. When a navigation opens another file,
+the `pos` and `sel` events of the new buffer come before its `open` event.
+Use the BUFID to find the path, with `get_buffers`. The BUFID of `close` is
+null.
