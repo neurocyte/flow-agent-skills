@@ -26,12 +26,12 @@ Find out which flow to use before you send a command.
    `flow --connect NAME --exec ...`.
 3. Else, run `flow --list-servers --json`. Each line is one running instance
    with its socket path and its projects, current project first. An instance
-   matches if its current project is your working directory or a parent
+   matches when its current project is your working directory or a parent
    directory of it. If exactly one instance matches, connect with its
    `socket` value.
 4. If no instance matches, or more than one matches, stop and ask the user
    which instance to use. Show each instance with its name and its current
-   project. Do this also if only one instance runs. Do not choose from other
+   project. Ask also when only one instance runs. Do not choose from other
    signs, for example a background project, or a project that has the file
    that the user named.
 
@@ -41,6 +41,27 @@ there.
 
 For remote machines, Docker containers and the limits of a forwarded socket,
 read `reference/connecting.md`.
+
+## Check the version
+
+This skill supports flow `v0.7.2-2149` and later. Do this check once, after
+you find the instance and before you send other commands.
+
+1. Run `flow --version </dev/null`. This is the version of the client.
+2. Run `flow --exec get_version_info </dev/null`, with the same connect
+   flag as your other calls. This is the version of the flow that you
+   drive. If it fails with `CommandNotFound`, that flow is too old.
+3. In both outputs, read the line `version: VERSION`. VERSION is a release
+   (`v0.8.0`) or a development build (`v0.7.2-2149-g9d417cb3c`, which is
+   2149 commits after `v0.7.2`). A `-dirty` suffix does not change the
+   order.
+4. Two kinds of version are supported: a release part later than
+   `v0.7.2`, and `v0.7.2-N-g...` with N 2149 or more.
+
+If one of the two versions is not supported, stop. Tell the user both
+versions and the minimum version. The user can update flow, or install an
+older tag of this skill that supports the older flow. If you cannot read a
+version, tell the user what you found and ask before you continue.
 
 ## Rules for every call
 

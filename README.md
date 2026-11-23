@@ -47,12 +47,21 @@ the flow socket and give the agent the local socket path.
 `skills/drive-flow/reference/connecting.md` gives the forward commands and
 their limits.
 
-## Requirements
+## Versions
 
-The skill needs a flow build with the remote state queries (`get_buffers`,
-`get_editors`, `get_focus` and the other `get_*` commands). Run
-`flow --exec get_commands </dev/null` in a flow terminal to see whether your
-flow has them.
+The `master` branch of this repository supports flow `v0.7.2-2149` and
+later. The agent checks the version of the `flow` client and of the flow
+that it drives before it sends other commands. If a version is too old, the
+agent stops and tells you.
+
+Each flow release gets a tag with the same name in this repository. To use
+the skill with an older flow release, add the marketplace at that tag:
+
+```
+/plugin marketplace add neurocyte/flow-agent-skills#v0.8.0
+```
+
+For other agents, clone the tag with `git clone --branch v0.8.0`.
 
 ## License
 
