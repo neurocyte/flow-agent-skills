@@ -25,13 +25,13 @@ Find out which flow to use before you send a command.
 2. If the user gave a server name (flow started with `--server NAME`), use
    `flow --connect NAME --exec ...`.
 3. Else, run `flow --list-servers --json`. Each line is one running instance
-   with its socket path and its projects, current project first. An instance
-   matches when its current project is your working directory or a parent
-   directory of it. If exactly one instance matches, connect with its
+   with its socket path and its projects, current project first. A matching
+   instance has your working directory, or a parent directory of it, as its
+   current project. If exactly one instance matches, connect with its
    `socket` value.
 4. If no instance matches, or more than one matches, stop and ask the user
    which instance to use. Show each instance with its name and its current
-   project. Ask also when only one instance runs. Do not choose from other
+   project. If only one instance runs, ask too. Do not choose from other
    signs, for example a background project, or a project that has the file
    that the user named.
 
@@ -48,15 +48,15 @@ This skill supports flow `v0.7.2-2149` and later. Do this check once, after
 you find the instance and before you send other commands.
 
 1. Run `flow --version </dev/null`. This is the version of the client.
-2. Run `flow --exec get_version_info </dev/null`, with the same connect
-   flag as your other calls. This is the version of the flow that you
-   drive. If it fails with `CommandNotFound`, that flow is too old.
+2. Run `flow --exec get_version_info </dev/null`, with the same connect flag
+   as your other calls. This is the version of the flow that you drive. If
+   it fails with `CommandNotFound`, that flow is too old.
 3. In both outputs, read the line `version: VERSION`. VERSION is a release
    (`v0.8.0`) or a development build (`v0.7.2-2149-g9d417cb3c`, which is
    2149 commits after `v0.7.2`). A `-dirty` suffix does not change the
    order.
-4. Two kinds of version are supported: a release part later than
-   `v0.7.2`, and `v0.7.2-N-g...` with N 2149 or more.
+4. Two kinds of version are supported: a release part later than `v0.7.2`,
+   and `v0.7.2-N-g...` with N 2149 or more.
 
 If one of the two versions is not supported, stop. Tell the user both
 versions and the minimum version. The user can update flow, or install an
@@ -66,7 +66,8 @@ version, tell the user what you found and ask before you continue.
 ## Rules for every call
 
 - Run `flow` with `</dev/null`. If standard input is a pipe or a file, flow
-  opens it as a new `*stdin*` buffer in the user's editor.
+  opens it as a new `*stdin*` buffer in the user's editor. The only
+  exception is the info box call in "Explain code in an info box".
 - If you parse the output, give `--json`. Each reply is one JSON line:
   `{"id": N, "command": NAME, "reply": VALUE}`. A command sends zero or more
   data replies, then the reply `"ok"`.
@@ -183,6 +184,55 @@ navigate {"file": "/abs/path/src/main.c", "line": 42, "column": 7}
 Inside a flow terminal, opening a file moves the focus from the terminal to
 the editor. The user then types into the editor, not into your terminal. If
 you open a file only for your own work, give `--no-focus`.
+
+## Explain code in an info box
+
+To explain a symbol to the user, select it in the editor and show your
+explanation in an info box next to it. The box shows markdown, the same as a
+hover box from a language server. It needs flow `v0.7.2-2159` or later, for
+the client and for the flow that you drive. An older flow fails with
+`CommandNotFound` or an unknown flag.
+
+1. Find the byte offset of the symbol in the file, for example with
+   `grep -bo 'name' FILE`. The offset counts bytes from the start of the
+   file, with two bytes for each CRLF line end. If the buffer is dirty, the
+   file on disk is out of date: compute the offset from `get_buffer_text`.
+2. Count the characters of the symbol. Count characters, not bytes and not
+   screen columns. `größe` is 5 characters and `名前` is 2.
+3. Write your explanation to a markdown file.
+4. Write a script file with these lines. NAME is a buffer name such as
+   `*info-7f3a*`. Make it unique, and use no `:`, `;` or spaces in it.
+
+   ```
+   navigate {"file": "/abs/path/src/main.zig"}
+   goto_byte_offset 1234
+   select_right 9
+   show_info_box "NAME"
+   delete_buffer "NAME"
+   ```
+
+5. Run the script, with the markdown file as standard input:
+
+   ```
+   flow --connect SERVER --no-wait --scratch --hidden --file-name 'NAME' --exec-file SCRIPT < EXPLAIN.md
+   ```
+
+`--scratch --hidden --file-name NAME` puts standard input in a hidden
+temporary buffer named NAME. The user does not see it, and the active editor
+does not change. The script starts after flow has all of the input.
+`show_info_box` shows the buffer text in a box at the selection, and
+`delete_buffer` then removes the buffer.
+
+Do not use `select_range` for this. Its columns are screen columns, so a tab
+or a wide character before the symbol moves the selection.
+
+If the exit code is 1, the buffer can still be there. Remove it with
+`flow --exec 'delete_buffer:NAME' </dev/null`. A NAME that is still open
+fails with `BufferAlreadyOpen`.
+
+If the cursor leaves the selection, the box closes. With `--hidden`, the
+client leaves the terminal focus as it is. Add `--focus` to move the focus
+to the editor.
 
 ## Run commands in a terminal
 
