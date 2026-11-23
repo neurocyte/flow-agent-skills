@@ -67,7 +67,8 @@ version, tell the user what you found and ask before you continue.
 
 - Run `flow` with `</dev/null`. If standard input is a pipe or a file, flow
   opens it as a new `*stdin*` buffer in the user's editor. The only
-  exception is the info box call in "Explain code in an info box".
+  exceptions are the calls in "Explain code in an info box" and "Show a list
+  of locations".
 - If you parse the output, give `--json`. Each reply is one JSON line:
   `{"id": N, "command": NAME, "reply": VALUE}`. A command sends zero or more
   data replies, then the reply `"ok"`.
@@ -233,6 +234,60 @@ fails with `BufferAlreadyOpen`.
 If the cursor leaves the selection, the box closes. With `--hidden`, the
 client leaves the terminal focus as it is. Add `--focus` to move the focus
 to the editor.
+
+## Show a list of locations
+
+To give the user locations to review, open them as a named file list. The
+list shows in the panel at the bottom of the editor, for example with the
+results of a code review. Each entry shows a location and your description
+of it. The user clicks an entry, or goes to the next or the previous entry,
+and flow opens the file there. It needs flow `v0.7.2-2163` or later, for the
+client and for the flow that you drive.
+
+1. Write a text file with one entry on each line:
+
+   ```
+   src/main.zig:120:9:19 parse_args ignores an empty value
+   src/main.zig:200 the error message does not name the file
+   ```
+
+   The line starts with a file link, then a space and the description. A
+   line that does not start with a link is not an entry.
+
+2. Write a script file with these lines. NAME is the name of the list.
+   BUFFER is a buffer name such as `*list-7f3a*`. Make it unique, and use no
+   `:`, `;` or spaces in it.
+
+   ```
+   open_filelist "NAME" "BUFFER"
+   delete_buffer "BUFFER"
+   ```
+
+3. Run the script, with the text file as standard input:
+
+   ```
+   flow --connect SERVER --no-wait --scratch --hidden --file-name 'BUFFER' --exec-file SCRIPT < LIST.txt
+   ```
+
+A file link is `PATH:LINE`, `PATH:LINE:COLUMN` or
+`PATH:LINE:COLUMN:END_COLUMN`. For a range over more than one line, use
+`PATH:LINE:COLUMN:END_LINE:END_COLUMN`. A path is absolute, or relative to
+the project directory.
+
+- Lines and columns are 1-based. A column is a byte offset in the line, not
+  a character or a screen column. `grep -bo` gives byte offsets from the
+  start of the file, so subtract the offset of the line start.
+- END_COLUMN is the column after the last byte of the range. To select
+  `parse_args` that starts at column 9, give `9:19`.
+- With a range, flow selects the range. Without one, it puts the cursor at
+  the column.
+
+The entries keep the order of the file. If you run `open_filelist` again
+with the same NAME, the new entries replace the old ones. A list with no
+entries closes.
+
+If the exit code is 1, the buffer can still be there. Remove it with
+`flow --exec 'delete_buffer:BUFFER' </dev/null`.
 
 ## Run commands in a terminal
 

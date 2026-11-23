@@ -9,6 +9,7 @@ the `flow` remote client. With the skill, an agent can:
 - edit files by path and save them
 - run commands in a terminal panel and read their output
 - explain a symbol in an info box next to it in your editor
+- show a named list of locations to review, each with a description
 
 The agent connects only to a flow that you started. It never starts one.
 
