@@ -6,7 +6,7 @@ the `flow` remote client. With the skill, an agent can:
 
 - open files and locations in your editor
 - read the open buffers, cursors, diagnostics, terminals and the log
-- edit files by path and save them
+- edit files by path and save them, or edit the code at your cursor
 - run commands in a terminal panel and read their output
 - explain a symbol in an info box next to it in your editor
 - show a named list of locations to review, each with a description

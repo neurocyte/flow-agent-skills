@@ -93,9 +93,10 @@ The list comes from the running instance, so it is always current.
 
 ## Read the editor state
 
-These queries change nothing. Lines and columns are 1-based. A BUFID (buffer
-id) looks like `["BUFID", 3]`. Queries that take a BUFID also take the
-integer alone.
+These queries change nothing. Lines and columns are 1-based. The columns of
+`get_editors` and `get_diagnostics` are screen columns: a tab goes to the
+next tab stop, and a wide character counts 2. A BUFID (buffer id) looks like
+`["BUFID", 3]`. Queries that take a BUFID also take the integer alone.
 
 - `get_focus`: `["focus", kind, name, id, mode]`. kind is `mini_mode`,
   `overlay`, `panel`, `editor` or `home`.
@@ -162,6 +163,28 @@ acknowledgment comes before the write, so run `get_buffers` again until
 dirty is `false`.
 
 Flow keeps the edit in its undo history, so the user can undo it.
+
+## Edit at the cursor
+
+The user can ask you to change the code at the cursor, for example "add a
+doc comment to this function".
+
+1. Run `get_editors`. The editor with active `true` is the one that the user
+   works in. Its first cursor is the primary cursor. The focus can be on a
+   terminal panel, and the active editor is still the right one.
+2. Run `get_buffers` and find the path of that BUFID.
+3. Read the lines around the cursor with `get_buffer_text BUFID FIRST LAST`.
+   The buffer can hold changes that are not saved, so do not read the file
+   on disk.
+4. Find the code to change in that text. The cursor column is a screen
+   column, so use the cursor line only to find the code. Compute the byte
+   offset of the edit from the line text.
+5. Make the edit with `apply_workspace_edit`, as in "Edit a file". The path
+   is absolute, or the path that `get_buffers` shows.
+
+The edit goes into the buffer, not to the disk. The cursor moves with the
+text, so it stays at the same code. Do not save unless the user asks. Tell
+the user the new line numbers, so that they can read the change.
 
 ## Open a file or a location
 
