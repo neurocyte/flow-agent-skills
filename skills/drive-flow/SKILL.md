@@ -216,19 +216,20 @@ you open a file only for your own work, give `--no-focus`.
 This recipe is for these requests: a guided review, an annotated
 walk-through of a fix or a change, a code tour, and an explanation of how
 some code works. For these, show the walk-through in the editor, not only in
-your reply. It needs flow `v0.7.2-2165` or later.
+your reply. It needs flow `v0.7.2-2170` or later.
 
 1. Pick the stops and put them in the order of the story. For a fix, show
    the path of the bug first, then each change.
 2. Open the stops as a named file list, as in "Show a list of locations".
    Give each entry a short description of one line, for example
-   `2. the lock is held here`.
+   `2. the lock is held here`. Keep the id of the list from the reply.
 3. Write a full explanation in markdown for each stop. Run the follower
-   script with these explanations, as in "Follow the user through
-   locations". When the user goes to a stop, the script shows its
+   script with the id and these explanations, as in "Follow the user
+   through locations". When the user goes to a stop, the script shows its
    explanation in an info box at the code.
 4. In your reply, give the name of the list. Tell the user to click the
-   entries or to go to the next entry, and say how long the script runs.
+   entries or to go to the next entry. Say how long the script runs, and
+   that closing the list ends the walk-through.
 
 Do steps 2 and 3 both. The list has room for one line only, and the info
 boxes hold the explanation. Send the list and the boxes through hidden
@@ -325,6 +326,9 @@ Flow reads the list from standard input into the hidden buffer BUFFER, and
 not give its path to `open_filelist`. If the list does not show, run
 `show_filelist`.
 
+From flow `v0.7.2-2168`, the client prints `filelist ID`. ID is the id of
+the list. The other list commands take this id, see "Manage file lists".
+
 A file link is `PATH:LINE`, `PATH:LINE:COLUMN` or
 `PATH:LINE:COLUMN:END_COLUMN`. For a range over more than one line, use
 `PATH:LINE:COLUMN:END_LINE:END_COLUMN`. A path is absolute, or relative to
@@ -345,16 +349,43 @@ entries closes.
 If the exit code is 1, the buffer can still be there. Remove it with
 `flow --exec 'delete_buffer:BUFFER' </dev/null`.
 
+## Manage file lists
+
+These commands need flow `v0.7.2-2171` or later. ID is a list id, and INDEX
+is the 0-based position of an entry in the list.
+
+- `get_filelists` replies `["filelist", ID, KIND, LABEL, COUNT, SELECTED]`
+  for each list. SELECTED is the INDEX of the selected entry, or null.
+- `get_filelist ID [FIRST LAST]` replies `["item", INDEX, PATH, BEGIN_LINE,
+  BEGIN_COL, END_LINE, END_COL, SEVERITY, TEXT]` for each entry, or for the
+  entries from FIRST to LAST. `get_filelist_item ID INDEX` replies one entry.
+  Lines and columns are the same as in a file link. SEVERITY is `Error`,
+  `Warning`, `Information` or `Hint`.
+- `set_filelist_item ID INDEX PATH BEGIN_LINE BEGIN_COL END_LINE END_COL
+  SEVERITY TEXT` replaces an entry. If INDEX is the count, it adds the entry
+  at the end.
+- `delete_filelist_item ID INDEX` removes an entry. A list with no entries
+  closes.
+- `select_filelist_item ID INDEX` selects an entry and goes to its
+  location, as a click does. Use it to lead the user to a stop.
+- `filelist_close ID` closes the list.
+
+`open_filelist NAME BUFFER KIND` makes a list of another kind, and
+`open_filelist ID BUFFER` replaces the entries of the list ID. Flow also
+uses the kinds `diagnostics` and `references` for the results of the
+language server, which replace their entries. For your own lists, use the
+default kind.
+
 ## Follow the user through locations
 
 To explain each location while the user steps through a list, run the
 follower script. A walk-through uses it for every stop, see "Walk the user
-through code". The script waits for the user's cursor. When the cursor
-reaches a line that you gave, it shows your explanation in an info box at
-the cursor. It needs flow `v0.7.2-2165` or later, for the client and for the
-flow that you drive.
+through code". The script follows the selected entry of the list. When the
+user selects an entry and the cursor reaches it, the script shows your
+explanation in an info box at the cursor. It needs flow `v0.7.2-2170` or
+later, for the client and for the flow that you drive.
 
-1. Open the list as in "Show a list of locations".
+1. Open the list as in "Show a list of locations", and keep its id.
 2. Write a JSON file with one object for each location:
 
    ```
@@ -365,26 +396,26 @@ flow that you drive.
    ```
 
    path is absolute, or relative to the project directory. line is 1-based.
-   Use the same lines as in the list.
+   Use the same path and the first line of each entry of the list.
 
 3. Run the script in the background. It is `scripts/follow-info-boxes.py` in
    the directory of this skill:
 
    ```
-   python3 -I SKILL_DIR/scripts/follow-info-boxes.py --connect SERVER --timeout 1800 ENTRIES.json
+   python3 -I SKILL_DIR/scripts/follow-info-boxes.py --connect SERVER --timeout 1800 ID ENTRIES.json
    ```
 
    Without `FLOW_SOCKET`, give `--connect` as for every other call.
 
-If the cursor or a selection moves onto one of the lines, the script shows
-the box. A list entry moves the cursor there, and so does the user with the
-keys or the mouse. If the cursor stays on the line, the script does not show
-the box again. If the cursor leaves the range of the box, the box closes. A
-scroll does not close it.
+The user selects an entry with a click, or with the next or the previous
+entry. If the cursor leaves the entry and comes back while the entry is
+still selected, the script shows the box again. If the cursor leaves the
+range of the box, the box closes. A scroll does not close it.
 
-These events stop the script: flow quits, the timeout ends, or you send
-SIGTERM. If the user is done with the list, stop the script. Tell the user
-that the script runs, and for how long.
+These events stop the script: the user closes the list, flow quits, the
+timeout ends, or you send SIGTERM. Tell the user that the script runs, and
+for how long. If the script stopped and the user is not done, you can start
+it again.
 
 ## Run commands in a terminal
 
@@ -437,3 +468,9 @@ is not the numbering of the queries. When a navigation opens another file,
 the `pos` and `sel` events of the new buffer come before its `open` event.
 Use the BUFID to find the path, with `get_buffers`. The BUFID of `close` is
 null.
+
+`follow_filelist ID` streams the events of one file list:
+`["filelist", ID, "selected", INDEX]` when the selection changes, with
+null for no selection, `["filelist", ID, "changed"]` when the entries
+change, and `["filelist", ID, "closed"]` when the list closes. The first
+reply gives the current selection.

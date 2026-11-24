@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Show an info box when the user's cursor reaches a given line in flow.
+"""Show an info box for each entry of a flow file list that the user selects.
 
-Usage: follow-info-boxes.py [--connect SERVER] [--timeout SECONDS] ENTRIES.json
+Usage: follow-info-boxes.py [--connect SERVER] [--timeout SECONDS] LIST_ID ENTRIES.json
 
-ENTRIES.json is a list of {"path": PATH, "line": LINE, "markdown": TEXT}.
-PATH is absolute or relative to the project directory, LINE is 1-based.
-When the primary cursor or a selection of an editor moves onto LINE of PATH,
-the script shows TEXT as markdown in an info box at that cursor. It shows
-the box again only after the cursor leaves the entry. The script stops when
-flow quits, when the timeout ends, or when it gets SIGTERM.
+LIST_ID is the id that open_filelist replied. ENTRIES.json is a list of
+{"path": PATH, "line": LINE, "markdown": TEXT}, with the same PATH and LINE
+as an entry of the list. PATH is absolute or relative to the project
+directory, LINE is 1-based. When the user selects that entry and the cursor
+reaches its location, the script shows TEXT as markdown in an info box at
+the cursor. It shows the box again only after the cursor leaves the entry.
+The script stops when the user closes the list, when flow quits, when the
+timeout ends, or when it gets SIGTERM.
 
-Needs flow v0.7.2-2165 or later (follow_editors, info boxes that stay open
-while the view scrolls).
+Needs flow v0.7.2-2170 or later (follow_filelist, get_filelist).
 """
 
 import argparse
@@ -28,6 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--connect")
     parser.add_argument("--timeout", type=float, default=1800)
+    parser.add_argument("list_id", type=int)
     parser.add_argument("entries")
     args = parser.parse_args()
     connect = ["--connect", args.connect] if args.connect else []
@@ -49,6 +51,18 @@ def main():
     with open(args.entries) as f:
         for entry in json.load(f):
             entries[(absolute(entry["path"]), entry["line"])] = entry["markdown"]
+
+    items = []
+
+    def read_items():
+        replies, rc = flow("--exec", f"get_filelist:{args.list_id}")
+        if rc != 0:
+            return False
+        items[:] = [(absolute(r[2]), r[3], r[5]) for r in replies if r[0] == "item"]
+        return True
+
+    if not read_items():
+        sys.exit(f"follow-info-boxes: no file list {args.list_id}")
 
     buffer_paths = {}
 
@@ -76,10 +90,12 @@ def main():
         if rc != 0:
             flow("--exec", f"delete_buffer:{name}")
 
-    stream = subprocess.Popen(["flow", *connect, "--keep-open", "--json", "--exec", "follow_editors"],
-                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, text=True)
+    stream = subprocess.Popen(
+        ["flow", *connect, "--keep-open", "--json", "--exec", f"follow_filelist:{args.list_id};follow_editors"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, text=True)
     end = time.monotonic() + args.timeout
-    last = None
+    selected = None
+    shown = False
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     try:
         for line in stream.stdout:
@@ -88,7 +104,19 @@ def main():
             if not line.startswith("{"):
                 continue
             reply = json.loads(line)["reply"]
-            if reply == "ok" or reply[0] != "editor":
+            if reply == "ok":
+                continue
+            if reply[0] == "filelist":
+                event = reply[2]
+                if event == "closed":
+                    break
+                if event == "changed":
+                    read_items()
+                elif event == "selected":
+                    selected = reply[3]
+                    shown = False
+                continue
+            if reply[0] != "editor" or selected is None or selected >= len(items):
                 continue
             _, bufid, _, event = reply
             if bufid is None:
@@ -103,12 +131,15 @@ def main():
                 row = event[2]
             else:
                 continue
-            key = (buffer_path(bufid[1]), row + 1)
-            if key not in entries:
-                last = None
-            elif key != last:
-                last = key
-                show(entries[key])
+            path, begin_line, end_line = items[selected]
+            inside = buffer_path(bufid[1]) == path and begin_line <= row + 1 <= end_line
+            if not inside:
+                shown = False
+            elif not shown:
+                shown = True
+                markdown = entries.get((path, begin_line))
+                if markdown:
+                    show(markdown)
     except KeyboardInterrupt:
         pass
     finally:
