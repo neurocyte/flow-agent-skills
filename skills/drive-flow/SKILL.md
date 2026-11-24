@@ -4,7 +4,9 @@ description:
   Drive a running Flow Control (flow) text editor through its remote client.
   Use it inside a flow terminal panel (FLOW_SOCKET is set). Also use it to
   open files, show a location, edit buffers, run commands, or read editor,
-  terminal or log state in flow.
+  terminal or log state in flow. Use it for a guided or annotated
+  walk-through, a code review or a code explanation that the user reads in
+  flow.
 ---
 
 # Drive a running flow
@@ -209,6 +211,30 @@ Inside a flow terminal, opening a file moves the focus from the terminal to
 the editor. The user then types into the editor, not into your terminal. If
 you open a file only for your own work, give `--no-focus`.
 
+## Walk the user through code
+
+This recipe is for these requests: a guided review, an annotated
+walk-through of a fix or a change, a code tour, and an explanation of how
+some code works. For these, show the walk-through in the editor, not only in
+your reply. It needs flow `v0.7.2-2165` or later.
+
+1. Pick the stops and put them in the order of the story. For a fix, show
+   the path of the bug first, then each change.
+2. Open the stops as a named file list, as in "Show a list of locations".
+   Give each entry a short description of one line, for example
+   `2. the lock is held here`.
+3. Write a full explanation in markdown for each stop. Run the follower
+   script with these explanations, as in "Follow the user through
+   locations". When the user goes to a stop, the script shows its
+   explanation in an info box at the code.
+4. In your reply, give the name of the list. Tell the user to click the
+   entries or to go to the next entry, and say how long the script runs.
+
+Do steps 2 and 3 both. The list has room for one line only, and the info
+boxes hold the explanation. Send the list and the boxes through hidden
+buffers, as the two sections show. Do not write the walk-through to a file
+in the project, and do not open such a file in the editor.
+
 ## Explain code in an info box
 
 To explain a symbol to the user, select it in the editor and show your
@@ -265,9 +291,11 @@ list shows in the panel at the bottom of the editor, for example with the
 results of a code review. Each entry shows a location and your description
 of it. The user clicks an entry, or goes to the next or the previous entry,
 and flow opens the file there. It needs flow `v0.7.2-2163` or later, for the
-client and for the flow that you drive.
+client and for the flow that you drive. For a walk-through, also explain
+each entry in an info box, as in "Walk the user through code".
 
-1. Write a text file with one entry on each line:
+1. Write a temporary text file outside the project, with one entry on each
+   line:
 
    ```
    src/main.zig:120:9:19 parse_args ignores an empty value
@@ -292,6 +320,11 @@ client and for the flow that you drive.
    flow --connect SERVER --no-wait --scratch --hidden --file-name 'BUFFER' --exec-file SCRIPT < LIST.txt
    ```
 
+Flow reads the list from standard input into the hidden buffer BUFFER, and
+`delete_buffer` removes it. Do not open the text file in the editor, and do
+not give its path to `open_filelist`. If the list does not show, run
+`show_filelist`.
+
 A file link is `PATH:LINE`, `PATH:LINE:COLUMN` or
 `PATH:LINE:COLUMN:END_COLUMN`. For a range over more than one line, use
 `PATH:LINE:COLUMN:END_LINE:END_COLUMN`. A path is absolute, or relative to
@@ -315,7 +348,8 @@ If the exit code is 1, the buffer can still be there. Remove it with
 ## Follow the user through locations
 
 To explain each location while the user steps through a list, run the
-follower script. The script waits for the user's cursor. When the cursor
+follower script. A walk-through uses it for every stop, see "Walk the user
+through code". The script waits for the user's cursor. When the cursor
 reaches a line that you gave, it shows your explanation in an info box at
 the cursor. It needs flow `v0.7.2-2165` or later, for the client and for the
 flow that you drive.
