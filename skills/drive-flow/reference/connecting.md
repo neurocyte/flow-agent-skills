@@ -51,12 +51,12 @@ Each line is one instance:
 The first project is the current project of that instance. The others are
 its background projects, most recently used first.
 
-An instance matches if its current project is your working directory or a
-parent directory of it. If exactly one instance matches, connect with its
-`socket`. If no instance matches, or more than one matches, stop and ask the
-user which instance to use, also if only one instance runs. Do not choose
-from other signs, for example a background project, or a project that has
-the file that the user named.
+If the current project of an instance is your working directory or a parent
+directory of it, the instance matches. If exactly one instance matches,
+connect with its `socket`. If no instance matches, or more than one matches,
+stop and ask the user which instance to use, also if only one instance runs.
+Do not choose from other signs, for example a background project, or a
+project that has the file that the user named.
 
 An instance that does not reply in time is reported as not responding.
 `--list-servers` removes the socket files of crashed instances and reports
@@ -104,20 +104,32 @@ The socket mode is 0600, so the user in the container must have the uid of
 the host user. Docker Desktop on macOS and Windows does not pass Unix
 sockets through its file sharing, so this forward does not work there.
 
-### Relay into the container filesystem (Linux, native Docker)
+### Relay into a mounted directory (Linux, native Docker)
 
-This works for a container that already runs, with no change to the image.
+This works for a container that already runs and mounts a host directory,
+for example the project. It needs no root and no change to the image. The
+user runs `socat` on the host. It listens on a socket in the mounted
+directory and connects to flow. In flow, the user can run it as a task. A
+task runs in the project directory, so this puts the socket there:
 
 ```
-pid=$(docker inspect -f '{{.State.Pid}}' CONTAINER)
-sudo socat UNIX-LISTEN:/proc/$pid/root/tmp/flow.sock,fork,user=CUID,mode=0600 \
-  UNIX-CONNECT:$HOME/.local/state/flow/run/NAME.sock
-flow --connect /tmp/flow.sock
+socat UNIX-LISTEN:./.flow-host.sock,fork,mode=0600 UNIX-CONNECT:{{env:FLOW_SOCKET}}
 ```
 
-Only `socat` runs as root. CUID is the uid of the user in the container, who
-must have write permission on the socket. If the container restarts, its pid
-changes, and the user starts the relay again.
+In the container, connect to the same file at its path in the container:
+
+```
+flow --connect /path/in/container/.flow-host.sock
+```
+
+A task gets the `FLOW_SOCKET` of the flow that runs it, so the relay
+connects to that flow. Task command lines expand `{{env:...}}` from flow
+`v0.7.2-2173`. Outside flow, give the socket path of the instance in place
+of `{{env:FLOW_SOCKET}}`. The relay works only while `socat` runs. If the
+agent cannot connect, ask the user to start the relay again.
+
+The socket mode is 0600, so the user in the container must have the uid of
+the host user on the mounted directory. Git does not track socket files.
 
 ### sshd over `docker exec` (Docker Desktop and all other cases)
 
